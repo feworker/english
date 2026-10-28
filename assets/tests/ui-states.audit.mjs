@@ -1,0 +1,27 @@
+import { createRequire } from 'node:module';
+const { chromium } = createRequire(new URL('../config/package.json', import.meta.url))('playwright');
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const auditURL = new URL('dictation.html', process.env.DICTATION_TEST_URL || 'http://localhost:8765/').href;
+(async()=>{const browser=await chromium.launch({channel:'chrome',headless:true,args:['--disable-features=OverlayScrollbar']});const report={};const dir=process.env.DICTATION_AUDIT_OUTPUT || fs.mkdtempSync(join(tmpdir(), 'english-ui-states-'));fs.mkdirSync(dir,{recursive:true});try{
+ const ctx=await browser.newContext({viewport:{width:1280,height:900}});const p=await ctx.newPage();
+ await p.addInitScript(()=>{window.requestAnimationFrame=()=>0});await p.goto(auditURL);await p.getByRole('status').waitFor();await p.screenshot({path:dir+'/loading.png'});await p.emulateMedia({reducedMotion:'reduce'});report.loading=await p.locator('[role=status] > div').first().evaluate(e=>({animation:getComputedStyle(e).animationName}));assert.equal(report.loading.animation,'none');await p.close();
+ const err=await ctx.newPage();await err.route('**/assets/js/library.js',r=>r.fulfill({contentType:'text/javascript',body:'window.LIBRARY = undefined;'}));await err.goto(auditURL);await err.locator('#load-error').waitFor();await err.screenshot({path:dir+'/load-error.png'});report.error=await err.locator('#load-error').innerText();assert.match(report.error,/重新加载/);await err.close();
+ const touch=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true});const t=await touch.newPage();await t.goto(auditURL);await t.locator('#pool-count').waitFor();report.touch=await t.evaluate(()=>[...document.querySelectorAll('button:not([role=checkbox]),label[data-touch],a[data-touch]')].filter(e=>e.getBoundingClientRect().height).map(e=>{const r=e.getBoundingClientRect();return {id:e.id,text:e.textContent.trim(),w:r.width,h:r.height}}));for(const x of report.touch)assert.ok(x.h>=44&&x.w>=44,JSON.stringify(x));await t.locator('#topic').click();await t.getByRole('listbox').waitFor();await t.waitForTimeout(300);report.touchOptions=await t.getByRole('option').first().boundingBox();assert.ok(report.touchOptions.height>=44);await t.screenshot({path:dir+'/touch-menu.png',fullPage:false});await touch.close();
+ const s=await ctx.newPage();await s.goto(auditURL);await s.locator('#pool-count').waitFor();report.scroll=[];
+ for(const dark of [false,true]){await s.evaluate(d=>document.documentElement.classList.toggle('dark',d),dark);await s.locator('#topic').click();await s.getByRole('listbox').waitFor();await s.waitForTimeout(250);const vp=s.locator('[data-radix-select-viewport]');await vp.evaluate(e=>e.scrollTop=0);await s.waitForTimeout(100);const before=await vp.evaluate(e=>e.scrollTop);await vp.hover();await s.mouse.wheel(0,450);await s.waitForTimeout(100);const after=await vp.evaluate(e=>e.scrollTop);assert.ok(after>before);await s.getByRole('option').first().focus();await s.keyboard.press('End');await s.waitForTimeout(100);await s.keyboard.press('Enter');await s.waitForTimeout(100);assert.notEqual(await s.locator('#topic').innerText(),'全部主题');report.scroll.push({dark,before,after,keyboardEndSelected:await s.locator('#topic').innerText()});await s.screenshot({path:dir+'/scroll-'+(dark?'dark':'light')+'.png'});}
+ await s.emulateMedia({forcedColors:'active'});await s.locator('#topic').click();await s.getByRole('listbox').waitFor();report.forcedColors=await s.locator('[data-radix-select-viewport]').evaluate(e=>({width:getComputedStyle(e).scrollbarWidth,color:getComputedStyle(e).scrollbarColor}));assert.equal(report.forcedColors.width,'auto');assert.equal(report.forcedColors.color,'auto');await s.screenshot({path:dir+'/forced-colors.png'});await s.close();
+ const results = await ctx.newPage(); await results.goto(auditURL); await results.locator('#pool-count').waitFor();
+ for (const id of ['chinese-speech','auto']) if(await results.locator('#'+id).getAttribute('aria-checked')==='true') await results.locator('#'+id).click();
+ await results.locator('#topic').click(); await results.locator('[role=option][data-value="all"]').click();
+ await results.locator('#amount').click(); await results.locator('[role=option][data-value="20"]').click();
+ await results.locator('#start').click(); for(let i=0;i<20;i++){await results.locator('#answer').fill(i===0?'a'.repeat(120):'practice'); await results.locator('#answer').press('Enter');}
+ await results.locator('#results').waitFor(); await results.setViewportSize({width:390,height:844});
+ const table=results.getByRole('region',{name:'本轮听写答案核对'}); await table.focus();
+ const horizontalBefore=await table.evaluate(e=>e.scrollLeft); await results.keyboard.press('ArrowRight'); await results.waitForTimeout(200); const horizontalAfter=await table.evaluate(e=>e.scrollLeft); assert.ok(horizontalAfter>horizontalBefore);
+ report.longResults={rows:await results.locator('#result-rows tr').count(),horizontalBefore,horizontalAfter,pageOverflow:await results.evaluate(()=>document.documentElement.scrollWidth>innerWidth)};assert.equal(report.longResults.pageOverflow,false);
+ await results.screenshot({path:dir+'/long-results-mobile.png',fullPage:true});await results.close();
+ fs.writeFileSync(dir+'/states.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});

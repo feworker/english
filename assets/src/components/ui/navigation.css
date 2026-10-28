@@ -1,0 +1,8 @@
+.dictation-link{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:2.25rem;padding:.5rem .75rem;border:1px solid var(--border);border-radius:var(--radius);color:var(--foreground);font-size:.8125rem;font-weight:500;text-decoration:none;background:var(--card);transition:background-color var(--transition),color var(--transition)}
+.dictation-link:hover{background:var(--accent);color:var(--accent-foreground)}
+.dictation-link:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.dictation-link:active{transform:translateY(1px)}
+.dictation-link svg{width:1rem;height:1rem;flex-shrink:0}
+@media(pointer:coarse){.dictation-link{min-height:2.75rem}}
+@media(prefers-reduced-motion:reduce){.dictation-link{transition:none}}
+@media print{.dictation-link{display:none!important}}
