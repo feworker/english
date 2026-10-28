@@ -56,6 +56,10 @@ npm --prefix assets/config run build
 
 UI 自检：安装上述开发依赖后，执行 `node assets/tests/ui.audit.mjs` 和 `node assets/tests/ui-states.audit.mjs`。输出目录默认是系统临时目录，可用 `DICTATION_AUDIT_OUTPUT` 指定。包含明暗主题／四种宽度、颜色对比度、焦点／浮层／禁用状态、触屏点击区、加载与错误、滚动和打印视图；自动截图仍需要人工逐图检查，不能替代浏览器标签栏和真实设备验证。
 
-GitHub Pages：Settings → Pages → Deploy from a branch → main / (root)。
+GitHub Pages：Settings → Pages → Deploy from a branch → master / (root)。
 
 原有使用说明和校验记录保留在 `assets/docs/`，仅描述原文件的检查结果与旧版离线行为；其中历史路径以当时版本为准。
+
+## 分支协作
+
+以 `master` 为默认分支和 GitHub Pages 发布来源。功能分支合入前先 rebase 到最新 `master`，通过 Rebase merge 合并；仓库只启用 Rebase merge，并开启合并后自动删除源分支。本地分支在确认合入后也删除。使用命令行时采用 rebase 后的快进合并，不创建额外合并提交。
